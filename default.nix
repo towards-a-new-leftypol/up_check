@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> {}, }:
 
 let
-  haskell = pkgs.haskell.packages.ghc;
+  haskell = pkgs.haskell.packages.ghc912;
 
   drv = haskell.callCabal2nix "up-check" ./. {
   };
