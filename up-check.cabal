@@ -65,6 +65,7 @@ executable up-check
     -- Modules included in this executable, other than Main.
     other-modules:
         HttpClient
+        Socks
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -73,10 +74,16 @@ executable up-check
     build-depends:    base,
                       bytestring,
                       http-client,
+                      http-client-tls,
                       http-conduit,
                       safe-exceptions,
                       http-types,
-                      text
+                      cmdargs,
+                      aeson,
+                      transformers,
+                      socks,
+                      text,
+                      network
 
     -- Directories containing source files.
     hs-source-dirs:   src-exe
