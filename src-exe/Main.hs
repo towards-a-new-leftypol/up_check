@@ -31,8 +31,10 @@ data ProgramException = HttpException HttpError
 
 type IOe a = ExceptT ProgramException IO a
 
+
 liftHttpIO :: IO (Either HttpError a) -> IOe a
 liftHttpIO = ExceptT . fmap (first HttpException)
+
 
 getSettings :: IO JSONSettings
 getSettings = do

@@ -1,3 +1,4 @@
+-- vibe coded, untested
 {-# LANGUAGE OverloadedStrings #-}
 
 module Socks
@@ -59,6 +60,7 @@ mkSocksManager proxyHost proxyPort = withSocketsDo $ do
             { managerRawConnection = return makeSocksConnection
             , managerTlsConnection = return makeSocksConnection
             })
+
 
 resolveSockAddr :: String -> Int -> IO SockAddr
 resolveSockAddr host port = do
