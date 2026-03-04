@@ -1,4 +1,4 @@
--- vibe coded, untested
+-- vibe coded, works
 {-# LANGUAGE OverloadedStrings #-}
 
 module Socks

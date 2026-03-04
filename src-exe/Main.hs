@@ -11,8 +11,9 @@ import Data.Aeson (decode, encode, FromJSON, ToJSON)
 import GHC.Generics
 import Control.Monad.Trans.Except (ExceptT (..), runExceptT)
 import Data.Bifunctor (first)
+import Data.Maybe (fromMaybe)
 
-import HttpClient (get, HttpError)
+import HttpClient (get, pxyGet, HttpError)
 
 
 newtype CliArgs = CliArgs
@@ -20,8 +21,16 @@ newtype CliArgs = CliArgs
   } deriving (Show, Data)
 
 
+data ProxiedUrls = ProxiedUrls
+    { urls :: [ String ]
+    , socks5_host :: String
+    , socks5_port :: Int
+    } deriving (Generic, FromJSON, ToJSON)
+
+
 data JSONSettings = JSONSettings
     { get_urls :: [ String ]
+    , proxied_get_urls :: Maybe [ ProxiedUrls ]
     } deriving (Generic, FromJSON, ToJSON)
 
 
@@ -57,17 +66,27 @@ getSettings = do
 
 main :: IO ()
 main = do
-    putStrLn "Hello, Haskell!"
-
     settings <- getSettings
 
-    print $ encode settings
+    B.putStr $ encode settings
+    putStrLn ""
 
-    endResult <- runExceptT $
-        mapM (\u -> liftHttpIO $ get u []) (get_urls settings)
+    endResult <- runExceptT $ do
+        mapM_ (\u -> liftHttpIO $ get u []) (get_urls settings)
+        let proxied_get_urls_ = fromMaybe [] $ proxied_get_urls settings
+        mapM handleProxiedGets proxied_get_urls_
 
     case endResult of
         Left e -> do
             print e
             exitFailure
         Right _ -> putStrLn "Success"
+
+    where
+        handleProxiedGets :: ProxiedUrls -> IOe [ B.ByteString ]
+        handleProxiedGets proxied =
+            mapM (\u -> liftHttpIO $ pxyGet h p u []) (urls proxied)
+
+            where
+                h = socks5_host proxied
+                p = socks5_port proxied
