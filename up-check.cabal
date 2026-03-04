@@ -66,6 +66,7 @@ executable up-check
     other-modules:
         HttpClient
         Socks
+        TCP
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
