@@ -56,4 +56,8 @@ checkTCPService host port = do
         Nothing         -> return (Left $ TCPError host port Timeout "Connection timed out")
 
     where
-        hints = NS.defaultHints { NS.addrFlags = [NS.AI_ADDRCONFIG], NS.addrSocketType = NS.Stream }
+        hints = NS.defaultHints
+          { NS.addrFlags = [ NS.AI_ADDRCONFIG ]
+          , NS.addrSocketType = NS.Stream
+          , NS.addrFamily = NS.AF_INET
+          }
