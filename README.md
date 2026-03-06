@@ -57,4 +57,63 @@ nix-build
 
 # NixOS service definition
 
-TODO
+```nix
+#configuration.nix
+{ config, pkgs, lib, fetchurl, ... }:
+
+let
+  up-check-src = builtins.fetchGit {
+    url = "https://github.com/towards-a-new-leftypol/up_check.git";
+    ref = "master";
+  };
+
+  # Import the NixOS module from the fetched source
+  up-check-module = import "${up-check-src}/up_check_service.nix";
+
+in
+
+{
+  imports = [ up-check-module ];
+
+
+  services.up-check = {
+    enable = true;
+    
+    settings = {
+      get_urls = [
+        "https://example.com"
+        "https://example.com/overboard/catalog.json"
+        "https://example.com/mod.php"
+        "tcp://irc.example.com:6697"
+        "tcp://irc.example.com:6667"
+        "tcp://mail.example.com:993"
+        "tcp://mail.example.com:465"
+        "tcp://mail.example.com:587"
+        "tcp://mumble.example.com:64738"
+        "tcp://127.0.0.1:1111"
+      ];
+      proxied_get_urls = [
+        {
+          urls = [
+            "http://exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.b32.i2p/overboard/catalog.json"
+            "http://example.i2p"
+          ];
+          socks5_host = "127.0.0.1";
+          socks5_port = 19345;
+        }
+      ];
+      smtp_settings = {
+        host = "mail.example.com";
+        port = 465;
+        username = "user@example.com";
+        from_address = "user@example.com";
+        to_addresses = [ "admin@example.com", "admin2@gmail.com" ];
+      };
+    };
+    
+    password = "supersecret";
+    
+    onCalendar = "*:0/5"; # Run every 10 minutes
+  };
+}
+```
