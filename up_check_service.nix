@@ -70,7 +70,7 @@ in
     
     onCalendar = lib.mkOption {
       type = lib.types.str;
-      default = "*:0/5";
+      default = "*:0/10";
       description = "systemd OnCalendar timer specification.";
     };
   };

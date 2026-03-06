@@ -113,7 +113,7 @@ in
     
     password = "supersecret";
     
-    onCalendar = "*:0/5"; # Run every 10 minutes
+    onCalendar = "*:0/10"; # Run every 10 minutes
   };
 }
 ```
