@@ -41,7 +41,7 @@ Hits urls to check if they're up. If one is down, send an email
 - HTTP GET requests (simply looks for a 200 OK)
 - HTTP GET over a socks5 proxy
 - Raw TCP via the `tcp://host:port` url (but not over proxy)
-    - raw tcp simply triest to establish a connection and immediately closes it
+    - raw tcp simply tries to establish a connection and immediately closes it
     without attempting to send anything. This basically just checks if something
     is listening on that port.
 
