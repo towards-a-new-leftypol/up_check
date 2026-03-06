@@ -7,16 +7,16 @@ module Main where
 import qualified Data.ByteString.Lazy as B
 import System.Console.CmdArgs (cmdArgs, Data)
 import System.Exit (exitFailure)
-import Data.Aeson (decode, encode, FromJSON, ToJSON)
+import Data.Aeson (eitherDecode, encode, FromJSON, ToJSON)
 import GHC.Generics
 import Control.Monad.Trans.Except (ExceptT (..), runExceptT)
-import Data.Bifunctor (first)
+import Data.Bifunctor (first, second)
 import Data.Maybe (fromMaybe)
 import Data.List (isPrefixOf)
 
-import HttpClient (get, pxyGet, HttpError)
-import TCP (TCPError, checkTCPService)
-
+import HttpClient (get, pxyGet, HttpError (..))
+import TCP (TCPError (..), checkTCPService)
+import Email (SMTPEmailSettings, emailTheError)
 
 newtype CliArgs = CliArgs
   { settingsFile :: String
@@ -33,11 +33,12 @@ data ProxiedUrls = ProxiedUrls
 data JSONSettings = JSONSettings
     { get_urls :: [ String ]
     , proxied_get_urls :: Maybe [ ProxiedUrls ]
+    , smtp_settings :: SMTPEmailSettings
     } deriving (Generic, FromJSON, ToJSON)
 
 
 data ProgramException
-    = HttpException HttpError
+    = PHttpException HttpError
     | ConnectionException TCPError
     deriving Show
 
@@ -46,7 +47,7 @@ type IOe a = ExceptT ProgramException IO a
 
 
 liftHttpIO :: IO (Either HttpError a) -> IOe a
-liftHttpIO = ExceptT . fmap (first HttpException)
+liftHttpIO = ExceptT . fmap (first PHttpException)
 
 
 liftTCPIO :: IO (Either TCPError a) -> IOe a
@@ -65,14 +66,25 @@ getSettings = do
     else do
         putStrLn $ "Loading settings from: " ++ filePath
         content <- B.readFile filePath
-        case decode content :: Maybe JSONSettings of
-            Nothing -> do
-                putStrLn "Error: Invalid JSON format."
+        case eitherDecode content :: Either String JSONSettings of
+            Left e -> do
+                putStrLn $ "Error: Invalid JSON format: " <> e
                 exitFailure
-            Just settings -> return settings
+            Right settings -> return settings
+
 
 tcpPrefix :: String
 tcpPrefix = "tcp://"
+
+
+subjectFromException :: ProgramException -> String
+subjectFromException (PHttpException httpErr) = "Http error for " ++ getUrl httpErr
+    where
+        getUrl (HttpException url _) = url
+        getUrl (StatusCodeError url _ _) = url
+subjectFromException (ConnectionException tcpErr) = "TCP error for " ++
+  tcpPrefix ++ tcpErrorHost tcpErr ++ ":" ++ show (tcpErrorPort tcpErr)
+
 
 main :: IO ()
 main = do
@@ -89,6 +101,15 @@ main = do
     case endResult of
         Left e -> do
             print e
+            emailResult <- emailTheError
+                (smtp_settings settings)
+                (subjectFromException e)
+                (show e)
+
+            case emailResult of
+                Nothing -> putStrLn "Timeout occurred when sending outbound error email!"
+                Just _ -> return ()
+
             exitFailure
         Right _ -> putStrLn "Success"
 
@@ -101,7 +122,7 @@ main = do
                 liftTCPIO $ do
                     putStrLn $ "calling " <> u
                     checkTCPService host (read $ drop 1 port)
-            | otherwise = liftHttpIO $ get u [] >> pure (Right ())
+            | otherwise =  liftHttpIO $ second (const ()) <$> get u []
 
         handleProxiedGets :: ProxiedUrls -> IOe [ B.ByteString ]
         handleProxiedGets proxied =

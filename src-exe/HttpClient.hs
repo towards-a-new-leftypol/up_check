@@ -23,8 +23,8 @@ import Network.HTTP.Client (Manager)
 import Socks (mkSocksManager)
 
 data HttpError
-    = HttpException SomeException
-    | StatusCodeError Int LBS.ByteString
+    = HttpException String SomeException
+    | StatusCodeError String Int LBS.ByteString
     deriving (Show)
 
 type Header = (HeaderName, [ BS.ByteString ])
@@ -35,7 +35,7 @@ get_ mkManager url headers = do
     let req = foldl (\r (k,v) -> setRequestHeader k v r) initReq headers
     putStrLn $ "calling " ++ url
     manager <- mkManager
-    handleHttp (httpLbs req manager)
+    handleHttp url (httpLbs req manager)
 
 
 get :: String -> [ Header ] -> IO (Either HttpError LBS.ByteString)
@@ -47,15 +47,15 @@ pxyGet proxyHost_ proxyPort_ url headers =
     get_ (mkSocksManager proxyHost_ proxyPort_) url headers
 
 
-handleHttp :: IO (Response LBS.ByteString) -> IO (Either HttpError LBS.ByteString)
-handleHttp action = do
+handleHttp :: String -> IO (Response LBS.ByteString) -> IO (Either HttpError LBS.ByteString)
+handleHttp url action = do
     result <- tryAny action
     case result of
         Right response ->
             let responseBody = getResponseBody response
             in if 200 <= (statusCode $ getResponseStatus response) && (statusCode $ getResponseStatus response) < 300
                then return $ Right responseBody
-               else return $ Left (StatusCodeError (statusCode $ getResponseStatus response) responseBody)
+               else return $ Left (StatusCodeError url (statusCode $ getResponseStatus response) responseBody)
         Left e -> do
             putStrLn "Some nasty http exception must have occurred"
-            return $ Left $ HttpException e
+            return $ Left $ HttpException url e

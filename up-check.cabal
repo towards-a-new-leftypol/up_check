@@ -67,6 +67,7 @@ executable up-check
         HttpClient
         Socks
         TCP
+        Email
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -84,7 +85,9 @@ executable up-check
                       transformers,
                       socks,
                       text,
-                      network
+                      network,
+                      smtp-mail,
+                      mime-mail
 
     -- Directories containing source files.
     hs-source-dirs:   src-exe
