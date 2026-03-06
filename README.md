@@ -52,7 +52,7 @@ Hits urls to check if they're up. If one is down, send an email
 git clone https://github.com/towards-a-new-leftypol/up_check.git
 cd up_check
 nix-build
-./result/bin/up_check -- -s settings.json
+./result/bin/up_check -s settings.json
 ```
 
 # NixOS service definition
