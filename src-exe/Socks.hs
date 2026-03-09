@@ -1,5 +1,6 @@
 -- vibe coded, works
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 module Socks
   ( mkSocksManager
@@ -12,6 +13,8 @@ import Network.HTTP.Client
     , managerTlsConnection
     , socketConnection
     , managerSetMaxHeaderLength
+    , ManagerSettings (..)
+    , responseTimeoutMicro
     )
 import Network.HTTP.Client.Internal (Connection)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
@@ -38,6 +41,9 @@ import Network.Socket
 import qualified Data.List.NonEmpty as NE
 import qualified Data.ByteString.Char8 as BS8
 
+responseTimeout :: Int
+responseTimeout = 60 * 1_000_000 -- one minute in microseconds
+
 mkSocksManager :: String -> Int -> IO Manager
 mkSocksManager proxyHost proxyPort = withSocketsDo $ do
     proxyAddr <- resolveSockAddr proxyHost proxyPort
@@ -59,6 +65,7 @@ mkSocksManager proxyHost proxyPort = withSocketsDo $ do
         (tlsManagerSettings 
             { managerRawConnection = return makeSocksConnection
             , managerTlsConnection = return makeSocksConnection
+            , managerResponseTimeout = responseTimeoutMicro responseTimeout
             })
 
 
