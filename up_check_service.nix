@@ -87,6 +87,8 @@ in
         ExecStart = "${cfg.package}/bin/up-check --settingsfile=${settingsJSON} ${lib.concatStringsSep " " cfg.extraFlags}";
         PrivateTmp = true;
         ProtectSystem = "strict";
+        TimeoutStartSec = 1800;
+        TimeoutStopSec = 3600;
       };
     };
     

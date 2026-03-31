@@ -82,6 +82,7 @@ subjectFromException (PHttpException httpErr) = "Http error for " ++ getUrl http
     where
         getUrl (HttpException url _) = url
         getUrl (StatusCodeError url _ _) = url
+        getUrl (Timeout e) = e
 subjectFromException (ConnectionException tcpErr) = "TCP error for " ++
   tcpPrefix ++ tcpErrorHost tcpErr ++ ":" ++ show (tcpErrorPort tcpErr)
 

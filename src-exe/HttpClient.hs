@@ -19,23 +19,36 @@ import Network.HTTP.Client.Conduit (defaultManagerSettings)
 import Network.HTTP.Types.Header (HeaderName)
 import Control.Exception.Safe (tryAny, SomeException)
 import Network.HTTP.Client (Manager)
+import Control.Concurrent.Timeout (timeout)
 
 import Socks (mkSocksManager)
+
+httpTimeout :: Integer
+httpTimeout = 60 * 1000000 -- 60 seconds
 
 data HttpError
     = HttpException String SomeException
     | StatusCodeError String Int LBS.ByteString
+    | Timeout String
     deriving (Show)
 
 type Header = (HeaderName, [ BS.ByteString ])
 
 get_ :: IO Manager -> String -> [ Header ] -> IO (Either HttpError LBS.ByteString)
 get_ mkManager url headers = do
-    initReq <- parseRequest url
-    let req = foldl (\r (k,v) -> setRequestHeader k v r) initReq headers
-    putStrLn $ "calling " ++ url
-    manager <- mkManager
-    handleHttp url (httpLbs req manager)
+    result <- timeout httpTimeout $ do
+        initReq <- parseRequest url
+        let req = foldl (\r (k,v) -> setRequestHeader k v r) initReq headers
+        putStrLn $ "calling " ++ url
+        manager <- mkManager
+        handleHttp url (httpLbs req manager)
+
+    return
+        (
+            case result of
+                Nothing -> Left $ Timeout $ "get_ has timed out on " <> url
+                Just x -> x
+        )
 
 
 get :: String -> [ Header ] -> IO (Either HttpError LBS.ByteString)

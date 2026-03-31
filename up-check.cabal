@@ -87,7 +87,8 @@ executable up-check
                       text,
                       network,
                       smtp-mail,
-                      mime-mail
+                      mime-mail,
+                      unbounded-delays
 
     -- Directories containing source files.
     hs-source-dirs:   src-exe
