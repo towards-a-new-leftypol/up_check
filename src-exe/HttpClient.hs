@@ -15,7 +15,11 @@ import Network.HTTP.Client
     ( newManager
     , httpLbs
     )
-import Network.HTTP.Client.Conduit (defaultManagerSettings)
+import Network.HTTP.Client.Conduit
+    ( defaultManagerSettings
+    , ManagerSettings (..)
+    , responseTimeoutMicro
+    )
 import Network.HTTP.Types.Header (HeaderName)
 import Control.Exception.Safe (tryAny, SomeException)
 import Network.HTTP.Client (Manager)
@@ -36,7 +40,7 @@ type Header = (HeaderName, [ BS.ByteString ])
 
 get_ :: IO Manager -> String -> [ Header ] -> IO (Either HttpError LBS.ByteString)
 get_ mkManager url headers = do
-    result <- timeout httpTimeout $ do
+    result <- timeout (httpTimeout * 2) $ do
         initReq <- parseRequest url
         let req = foldl (\r (k,v) -> setRequestHeader k v r) initReq headers
         putStrLn $ "calling " ++ url
@@ -52,7 +56,9 @@ get_ mkManager url headers = do
 
 
 get :: String -> [ Header ] -> IO (Either HttpError LBS.ByteString)
-get = get_ (newManager defaultManagerSettings)
+get = get_ $ newManager $
+    defaultManagerSettings
+    { managerResponseTimeout = responseTimeoutMicro (fromIntegral httpTimeout) }
 
 
 pxyGet :: String -> Int -> String -> [Header] -> IO (Either HttpError LBS.ByteString)

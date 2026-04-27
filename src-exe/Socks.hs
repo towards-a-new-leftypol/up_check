@@ -42,7 +42,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.ByteString.Char8 as BS8
 
 responseTimeout :: Int
-responseTimeout = 60 * 1_000_000 -- one minute in microseconds
+responseTimeout = 90 * 1_000_000 -- one and a half minutes in microseconds
 
 mkSocksManager :: String -> Int -> IO Manager
 mkSocksManager proxyHost proxyPort = withSocketsDo $ do
