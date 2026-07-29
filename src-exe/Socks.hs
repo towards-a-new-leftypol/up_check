@@ -4,6 +4,7 @@
 
 module Socks
   ( mkSocksManager
+  , SocksConnectError (..)
   ) where
 
 import Network.HTTP.Client
@@ -40,9 +41,33 @@ import Network.Socket
     )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.ByteString.Char8 as BS8
+import Control.Exception (Exception, throwIO)
+import Data.Typeable (Typeable)
+import Control.Concurrent.Timeout (timeout)
+
+data SocksConnectError = SocksConnectError String
+    deriving (Show, Typeable)
+
+instance Exception SocksConnectError
 
 responseTimeout :: Int
 responseTimeout = 90 * 1_000_000 -- one and a half minutes in microseconds
+
+makeSocksConnection :: SocksConf -> Maybe HostAddress -> String -> Int -> IO Connection
+makeSocksConnection socksConf _maybeLocalIP destHost destPort = do
+    let destAddr = SocksAddress
+            (SocksAddrDomainName (BS8.pack destHost))
+            (fromIntegral destPort)
+
+    result <- timeout (45 * 1_000_000) $ socksConnect socksConf destAddr  -- 45 s for circuit
+
+    case result of
+        Nothing -> throwIO $
+            SocksConnectError $
+                "SOCKS circuit timeout connecting to "
+                <> destHost <> ":" <> show destPort
+
+        Just (sock, _) -> socketConnection sock 4096
 
 mkSocksManager :: String -> Int -> IO Manager
 mkSocksManager proxyHost proxyPort = withSocketsDo $ do
@@ -52,19 +77,10 @@ mkSocksManager proxyHost proxyPort = withSocketsDo $ do
             { socksVersion = SocksVer5
             }
     
-    let makeSocksConnection :: Maybe HostAddress -> String -> Int -> IO Connection
-        makeSocksConnection _maybeLocalIP destHost destPort = do
-            let destAddr = SocksAddress 
-                    (SocksAddrDomainName (BS8.pack destHost)) 
-                    (fromIntegral destPort)
-            
-            (sock, _resolved) <- socksConnect socksConf destAddr
-            socketConnection sock 4096
-    
     newManager $ managerSetMaxHeaderLength (16384 * 4)
         (tlsManagerSettings 
-            { managerRawConnection = return makeSocksConnection
-            , managerTlsConnection = return makeSocksConnection
+            { managerRawConnection = return $ makeSocksConnection socksConf
+            , managerTlsConnection = return $ makeSocksConnection socksConf
             , managerResponseTimeout = responseTimeoutMicro responseTimeout
             })
 

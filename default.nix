@@ -9,7 +9,6 @@ let
   env = drv.env.overrideAttrs (oldAttrs: {
     buildInputs = oldAttrs.buildInputs ++ [
       pkgs.haskellPackages.cabal-install
-      haskell.miso-from-html
       haskell.hlint
       haskell.haskell-language-server
     ];

@@ -4,7 +4,7 @@ module HttpClient
 ( HttpError(..)
 , Header
 , get
-, pxyGet
+, get_
 ) where
 
 import qualified Data.ByteString.Lazy as LBS
@@ -21,11 +21,11 @@ import Network.HTTP.Client.Conduit
     , responseTimeoutMicro
     )
 import Network.HTTP.Types.Header (HeaderName)
-import Control.Exception.Safe (tryAny, SomeException)
+import Control.Exception.Safe (tryAny, SomeException, fromException)
 import Network.HTTP.Client (Manager)
 import Control.Concurrent.Timeout (timeout)
 
-import Socks (mkSocksManager)
+import Socks (SocksConnectError (..))
 
 httpTimeout :: Integer
 httpTimeout = 60 * 1000000 -- 60 seconds
@@ -34,6 +34,7 @@ data HttpError
     = HttpException String SomeException
     | StatusCodeError String Int LBS.ByteString
     | Timeout String
+    | SocksConnectTimeout String
     deriving (Show)
 
 type Header = (HeaderName, [ BS.ByteString ])
@@ -61,20 +62,20 @@ get = get_ $ newManager $
     { managerResponseTimeout = responseTimeoutMicro (fromIntegral httpTimeout) }
 
 
-pxyGet :: String -> Int -> String -> [Header] -> IO (Either HttpError LBS.ByteString)
-pxyGet proxyHost_ proxyPort_ url headers =
-    get_ (mkSocksManager proxyHost_ proxyPort_) url headers
-
-
 handleHttp :: String -> IO (Response LBS.ByteString) -> IO (Either HttpError LBS.ByteString)
 handleHttp url action = do
     result <- tryAny action
     case result of
         Right response ->
-            let responseBody = getResponseBody response
-            in if 200 <= (statusCode $ getResponseStatus response) && (statusCode $ getResponseStatus response) < 300
-               then return $ Right responseBody
-               else return $ Left (StatusCodeError url (statusCode $ getResponseStatus response) responseBody)
-        Left e -> do
-            putStrLn "Some nasty http exception must have occurred"
-            return $ Left $ HttpException url e
+            let sc = statusCode $ getResponseStatus response
+            in if sc >= 200 && sc < 300
+               then return $ Right $ getResponseBody response
+               else return $ Left $ StatusCodeError url sc (getResponseBody response)
+
+        -- Catch the typed SOCKS failure specifically
+        Left e
+            | Just (SocksConnectError msg) <- fromException e ->
+                return $ Left $ SocksConnectTimeout msg
+
+            | otherwise ->
+                return $ Left $ HttpException url e

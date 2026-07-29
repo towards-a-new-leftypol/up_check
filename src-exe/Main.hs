@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 module Main where
 
@@ -13,10 +14,13 @@ import Control.Monad.Trans.Except (ExceptT (..), runExceptT)
 import Data.Bifunctor (first, second)
 import Data.Maybe (fromMaybe)
 import Data.List (isPrefixOf)
+import Control.Monad.IO.Class (liftIO)
+import Control.Concurrent (threadDelay)
 
-import HttpClient (get, pxyGet, HttpError (..))
+import HttpClient (get, get_, HttpError (..))
 import TCP (TCPError (..), checkTCPService)
 import Email (SMTPEmailSettings, emailTheError)
+import Socks (mkSocksManager)
 
 newtype CliArgs = CliArgs
   { settingsFile :: String
@@ -83,8 +87,34 @@ subjectFromException (PHttpException httpErr) = "Http error for " ++ getUrl http
         getUrl (HttpException url _) = url
         getUrl (StatusCodeError url _ _) = url
         getUrl (Timeout e) = e
+        getUrl (SocksConnectTimeout e) = e
 subjectFromException (ConnectionException tcpErr) = "TCP error for " ++
   tcpPrefix ++ tcpErrorHost tcpErr ++ ":" ++ show (tcpErrorPort tcpErr)
+
+
+-- | Retry wrapper: tries up to n times with exponential backoff.
+withRetries :: Int -> Int -> IO (Either HttpError a) -> IO (Either HttpError a)
+withRetries maxAttempts baseDelayMicros action = go 1
+  where
+    go attempt = do
+        result <- action
+        case result of
+            Right _  -> return result
+            Left err
+                | attempt >= maxAttempts -> return result
+                | isRetryable err -> do
+                    let delay = baseDelayMicros * (2 ^ (attempt - 1))
+                    putStrLn $ "Attempt " <> show attempt <> " failed ("
+                        <> show err <> "), retrying in "
+                        <> show (delay `div` 1_000_000) <> "s..."
+                    threadDelay delay
+                    go (attempt + 1)
+                | otherwise -> return result  -- non-retryable (e.g. 404)
+
+    isRetryable (HttpException _ _)    = True
+    isRetryable (Timeout _)            = True
+    isRetryable (SocksConnectTimeout _) = True
+    isRetryable (StatusCodeError _ c _) = c >= 500  -- retry server errors only
 
 
 main :: IO ()
@@ -126,8 +156,12 @@ main = do
             | otherwise =  liftHttpIO $ second (const ()) <$> get u []
 
         handleProxiedGets :: ProxiedUrls -> IOe [ B.ByteString ]
-        handleProxiedGets proxied =
-            mapM (\u -> liftHttpIO $ pxyGet h p u []) (urls proxied)
+        handleProxiedGets proxied = do
+            mgr <- liftIO $ mkSocksManager h p
+
+            liftHttpIO $ withRetries 3 (10 * 1_000_000) $ do
+                results <- mapM (\u -> get_ (pure mgr) u []) (urls proxied)
+                return $ sequence results
 
             where
                 h = socks5_host proxied
