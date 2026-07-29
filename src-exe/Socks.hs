@@ -42,11 +42,10 @@ import Network.Socket
 import qualified Data.List.NonEmpty as NE
 import qualified Data.ByteString.Char8 as BS8
 import Control.Exception (Exception, throwIO)
-import Data.Typeable (Typeable)
 import Control.Concurrent.Timeout (timeout)
 
 data SocksConnectError = SocksConnectError String
-    deriving (Show, Typeable)
+    deriving Show
 
 instance Exception SocksConnectError
 
